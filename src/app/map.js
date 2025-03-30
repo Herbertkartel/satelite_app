@@ -1,51 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { fromUrl } from 'geotiff';
-import { db } from './firebase'; // Import Firebase
-import { collection, getDocs } from 'firebase/firestore'; // Updated Firestore modular imports
+"use client"; // Ensure client-side rendering
+
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { fromUrl } from "geotiff";
+import { db } from "./firebase"; // Import Firebase
+import { collection, getDocs } from "firebase/firestore"; // Firestore imports
 
 export default function MapComponent() {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const [imageUrls, setImageUrls] = useState([]);
 
+  // ✅ Fetch image URLs once
   useEffect(() => {
-    // Initialize the map only on the client-side (since window is not defined in SSR)
-    if (typeof window !== 'undefined') {
-      if (!mapInstance.current) {
-        mapInstance.current = L.map(mapRef.current).setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors',
-        }).addTo(mapInstance.current);
-      }
-    }
-
-    // Fetch image URLs from Firebase Firestore
     const fetchImageUrls = async () => {
       try {
-        // Use Firestore modular API
-        const snapshot = await getDocs(collection(db, 'imageUrls'));
-        const urls = snapshot.docs.map(doc => doc.data().url); // Assuming each document has a 'url' field
+        const snapshot = await getDocs(collection(db, "satellite_images"));
+        const urls = snapshot.docs.map(doc => {
+          const rawUrl = doc.data().url;
+          // Remove extra quotes or encoding issues
+          return rawUrl.replace(/^%22|%22$/g, "").replace(/^"|"$/g, "");
+        });
+
+        if (urls.length === 0) throw new Error("No image URLs found");
         setImageUrls(urls);
       } catch (error) {
-        console.error('Error fetching image URLs from Firestore:', error);
+        console.error("Error fetching image URLs from Firestore:", error);
       }
     };
 
     fetchImageUrls();
+  }, []); // ✅ Runs only on mount
+
+  // ✅ Initialize map and render images
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (!mapInstance.current) {
+        mapInstance.current = L.map(mapRef.current).setView([0, 0], 2);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(mapInstance.current);
+      }
+    }
 
     async function fetchAndRenderImage(url) {
-      console.log('Fetching GeoTIFF from URL:', url);
       try {
         const tiff = await fromUrl(url);
         const image = await tiff.getImage();
         const [minX, minY, maxX, maxY] = image.getBoundingBox();
 
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = image.getWidth();
         canvas.height = image.getHeight();
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
 
         const raster = await image.readRasters();
         const data = raster[0];
@@ -66,21 +74,18 @@ export default function MapComponent() {
       }
     }
 
-    // Render the first image URL from the state if available
+    // ✅ Render images when URLs are ready
     if (imageUrls.length > 0) {
-      fetchAndRenderImage(imageUrls[0]);
-    } else {
-      console.error('No image URLs provided or the provided value is not an array');
+      imageUrls.forEach(url => fetchAndRenderImage(url));
     }
 
     return () => {
-      // Cleanup map instance on unmount
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
       }
     };
-  }, [imageUrls]); // Dependency on imageUrls
+  }, [imageUrls]); // ✅ Triggered only when imageUrls change
 
-  return <div ref={mapRef} style={{ height: '600px', width: '100%' }} />;
+  return <div ref={mapRef} style={{ height: "600px", width: "100%" }} />;
 }

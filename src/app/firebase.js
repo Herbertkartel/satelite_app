@@ -8,7 +8,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBiF5UEus89rL4gqMHa6v1m_ausPU4sQ4I",
   authDomain: "satelite-app-9d888.firebaseapp.com",
   projectId: "satelite-app-9d888",
-  storageBucket: "satelite-app-9d888.firebasestorage.app",
+  storageBucket: "satelite-app-9d888.firebasestorage.com",
   messagingSenderId: "345458793406",
   appId: "1:345458793406:web:8b5be01ae3c6ea486177ef",
   measurementId: "G-9NTHEW8FNZ"
